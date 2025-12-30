@@ -12,16 +12,11 @@ Author:     Thor I. Fossen
 """
 import os
 import sys 
-import webbrowser
+# import webbrowser
 import matplotlib.pyplot as plt
-from python_vehicle_simulator.vehicles import (
-    DSRV, frigate, otter, ROVzefakkel, semisub, shipClarke83, supply, tanker, 
-    remus100, torpedo
-)
+from python_vehicle_simulator.vehicles import shipClarke83 # (DSRV, frigate, otter, ROVzefakkel, semisub, shipClarke83, supply, tanker, remus100, torpedo)
 from python_vehicle_simulator.lib import (
-    printSimInfo, printVehicleinfo, simulate, plotVehicleStates, plotControls, 
-    plot3D
-)
+    printSimInfo, printVehicleinfo, simulate, plotVehicleStates, plotControls) #, plot3D)
 
 ### Simulation parameters ###
 sampleTime = 0.02                   # sample time [seconds]
