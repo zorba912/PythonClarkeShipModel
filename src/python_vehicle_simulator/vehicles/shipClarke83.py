@@ -53,6 +53,7 @@ class shipClarke83:
     shipClarke83()
         Rudder angle step inputs
     shipClarke83('headingAutopilot', psi_d, L, B, T, Cb, V_c, beta_c, tau_X)
+    #shipClarke83('headingAutopilot', psi_d, L, B, T, Cb, V_c, beta_c, V_desired)
         Heading autopilot
         
     Inputs:
@@ -68,7 +69,7 @@ class shipClarke83:
 
     def __init__(
         self,
-        controlSystem="stepInput",
+        controlSystem="headingAutopilot", 
         r = 0,
         L = 50.0,
         B = 7.0,
@@ -76,8 +77,11 @@ class shipClarke83:
         Cb = 0.7,
         V_current = 0,
         beta_current = 0,
-        tau_X = 1e5,
-    ):
+        U_desired=5.0, 
+        use_speed_controller=True):
+        
+        # Gọi constructor của lớp cha
+        #super().__init__(controlSystem, r, L, B, T, Cb, V_current, beta_current, tau_X=100000)
         
         # Constants
         D2R = math.pi / 180     # deg2rad
@@ -102,7 +106,7 @@ class shipClarke83:
         self.T = T  # Draft (m)
         self.Cb = Cb  # block coefficient
         self.Lambda = 0.7  # rudder aspect ratio:  Lambda = b**2 / AR
-        self.tau_X = tau_X  # surge force (N), pilot input
+        #self.tau_X = tau_X  # surge force (N), pilot input
         self.deltaMax = 30  # max rudder angle (deg)
         self.T_delta = 1.0  # rudder time constants (s)
         self.nu = np.array([2, 0, 0, 0, 0, 0], float)  # velocity vector
@@ -129,8 +133,16 @@ class shipClarke83:
         self.wn_d = self.wn / 5  # desired natural frequency in yaw
         self.zeta_d = 1  # desired relative damping ratio in yaw
 
-        # controller parameters m, d and k
-        U0 = 3  # cruise speed
+        # Thêm tính năng điều khiển vận tốc
+        self.U_desired = U_desired
+        self.use_speed_controller = use_speed_controller
+
+        # States cho surge controller
+        self.e_u_int = 0.0
+        self.e_u_prev = 0.0
+        
+        # controller parameters m, d and k cho heading autopilot
+        U0 = U_desired      # desired speed?
         [M, N] = clarke83(U0, self.L, self.B, self.T, self.Cb, self.R66, 0, self.L)
         self.m_PID = M[2][2]
         self.d_PID = N[2][2]
@@ -148,8 +160,50 @@ class shipClarke83:
         # tau_N = Yd * delta
         self.Nd = -0.25 * (x_R + a_H * x_H) * self.rho * U0 ** 2 * AR * CN
 
+        # Tính hệ số PID cho surge dựa trên pole placement
+        m_surge = M[0][0]  # khối lượng trong surge
+        d_surge = N[0][0]  # cản trong surge
+        
+        wn_surge = 0.1     # tần số tự nhiên (rad/s)
+        zeta_surge = 1.0   # damping ratio
+        
+        self.Kp_surge = m_surge * wn_surge**2
+        self.Kd_surge = m_surge * 2 * zeta_surge * wn_surge - d_surge
+        self.Ki_surge = (wn_surge / 10) * self.Kp_surge
+        
+        # Giới hạn lực đẩy
+        self.tau_X_max = 5000000  # N
+    
+    def surgeSpeedController(self, nu, sampleTime):
+        """
+        Bộ điều khiển PID cho vận tốc surge
+        """
+        u_actual = nu[0]
+        e_u = self.U_desired - u_actual
+        
+        # PID control
+        self.e_u_int += sampleTime * e_u
+        e_u_dot = (e_u - self.e_u_prev) / sampleTime
+        self.e_u_prev = e_u
+        
+        tau_X = (self.Kp_surge * e_u + 
+                self.Ki_surge * self.e_u_int + 
+                self.Kd_surge * e_u_dot)
+        
+        # Saturation
+        if tau_X > self.tau_X_max:
+            tau_X = self.tau_X_max
+            # Anti-windup
+            self.e_u_int -= sampleTime * e_u
+        elif tau_X < -self.tau_X_max * 0.5:
+            tau_X = -self.tau_X_max * 0.5
+            self.e_u_int -= sampleTime * e_u
+        
+        return tau_X
+    
     def dynamics(self, eta, nu, u_actual, u_control, sampleTime):
         """
+        Override dynamics để sử dụng speed controller
         [nu,u_actual] = dynamics(eta,nu,u_actual,u_control,sampleTime) integrates
         the ship equations of motion using Euler's method.
         """
@@ -182,7 +236,13 @@ class shipClarke83:
 
         # Control forces and moment
         delta_R = -delta  # physical rudder angle (rad)
-        T = self.tau_X  # thrust (N)
+        
+        # THAY ĐỔI CHÍNH: Sử dụng speed controller hoặc tau_X cố định
+        if self.use_speed_controller:
+            T = self.surgeSpeedController(nu, sampleTime)
+        else:
+            T = self.tau_X
+        
         t_deduction = 0.1  # thrust deduction number
         tau1 = (1 - t_deduction) * T - Xdd * math.sin(delta_R) ** 2
         tau2 = -Yd * math.sin(2 * delta_R)
