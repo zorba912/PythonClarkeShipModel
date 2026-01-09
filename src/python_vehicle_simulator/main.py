@@ -20,7 +20,7 @@ from python_vehicle_simulator.lib import (
 
 ### Simulation parameters ###
 sampleTime = 0.02                   # sample time [seconds]
-N = 10000                           # number of samples
+N = 7000                           # number of samples
 
 # 3D plot and animation settings where browser = {firefox,chrome,safari,etc.}
 numDataPoints = 50                  # number of 3D data points
@@ -72,14 +72,22 @@ def main():
         print('Error: Not a valid simulator option')
         sys.exit()
     """
-    vehicle = shipClarke83('headingAutopilot', -20.0, 70, 8, 6, 0.7, 0.5, 10.0, 1e5)
+    # vehicle = shipClarke83('headingAutopilot', -20.0, 70, 8, 6, 0.7, 0.5, 10.0, 1e5)
+
+
+    
+    psi_desired = -20.0  # desired heading (deg)
+
 
     # Main simulation loop 
-    [simTime, simData] = simulate(N, sampleTime, vehicle)
+    [simTime, simData] = simulate(N, sampleTime, shipClarke83('headingAutopilot', psi_desired, 70, 8, 6, 0.7, 0.5, 10.0, 1e5))
     
+
+
+
     # 3D plots and animation
     plotVehicleStates(simTime, simData, 1)                    
-    plotControls(simTime, simData, vehicle, 2)
+    plotControls(simTime, simData, shipClarke83('headingAutopilot', psi_desired, 70, 8, 6, 0.7, 0.5, 10.0, 1e5), 2)
     # plot3D(simData, numDataPoints, FPS, filename, 3)   
     
     """ Uncomment the line below for 3D animation in the web browswer. 
