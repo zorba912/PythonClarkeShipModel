@@ -75,13 +75,11 @@ class shipClarke83:
         B = 7.0,
         T = 5.0,
         Cb = 0.7,
-        V_current = 0,
+        V_current = 0,  
         beta_current = 0,
+        U_current = 0,
         U_desired=5.0, 
         use_speed_controller=True):
-        
-        # Gọi constructor của lớp cha
-        #super().__init__(controlSystem, r, L, B, T, Cb, V_current, beta_current, tau_X=100000)
         
         # Constants
         D2R = math.pi / 180     # deg2rad
@@ -109,7 +107,9 @@ class shipClarke83:
         #self.tau_X = tau_X  # surge force (N), pilot input
         self.deltaMax = 30  # max rudder angle (deg)
         self.T_delta = 1.0  # rudder time constants (s)
-        self.nu = np.array([2, 0, 0, 0, 0, 0], float)  # velocity vector
+        self.U_surge = U_current  # surge speed (m/s)
+
+        self.nu = np.array([self.U_surge, 0, 0, 0, 0, 0], float)  # velocity vector
         self.u_actual = np.array([0], float)  # control input vector
 
         if self.L > 100:
@@ -142,7 +142,7 @@ class shipClarke83:
         self.e_u_prev = 0.0
         
         # controller parameters m, d and k cho heading autopilot
-        U0 = U_desired      # desired speed?
+        U0 = U_desired      # desired speed
         [M, N] = clarke83(U0, self.L, self.B, self.T, self.Cb, self.R66, 0, self.L)
         self.m_PID = M[2][2]
         self.d_PID = N[2][2]
@@ -289,6 +289,8 @@ class shipClarke83:
 
         return u_control
 
+    loopNumber = 0;
+
     def headingAutopilot(self, eta, nu, sampleTime):
         """
         delta_c = headingAutopilot(eta,nu,sampleTime) is a PID controller
@@ -336,5 +338,6 @@ class shipClarke83:
         delta_c = tau_N / self.Nd  # rudder command
 
         u_control = np.array([delta_c], float)
-
+        loopnumber = self.loopNumber + 1
+        self.loopNumber = loopnumber
         return u_control
